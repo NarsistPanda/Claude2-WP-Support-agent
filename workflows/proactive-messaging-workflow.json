@@ -1,0 +1,308 @@
+{
+  "name": "WhatsApp Proactive Messaging",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Check Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM get_pending_scheduled_messages()"
+      },
+      "id": "get-pending-messages",
+      "name": "Get Pending Messages",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [460, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combineOperation": "all"
+        }
+      },
+      "id": "check-messages-exist",
+      "name": "Check Messages Exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process message templates with variables\nconst items = [];\n\nfor (const item of $input.all()) {\n  let messageContent = item.json.message_content;\n  \n  // If there's metadata with variables, replace them\n  if (item.json.metadata && typeof item.json.metadata === 'object') {\n    Object.keys(item.json.metadata).forEach(key => {\n      const placeholder = `{{${key}}}`;\n      messageContent = messageContent.replace(\n        new RegExp(placeholder, 'g'),\n        item.json.metadata[key]\n      );\n    });\n  }\n  \n  // Determine recipients\n  const recipients = [];\n  if (item.json.phone_number) {\n    recipients.push(item.json.phone_number);\n  }\n  if (item.json.phone_numbers && Array.isArray(item.json.phone_numbers)) {\n    recipients.push(...item.json.phone_numbers);\n  }\n  \n  // Create separate item for each recipient\n  recipients.forEach(recipient => {\n    items.push({\n      json: {\n        messageId: item.json.id,\n        phoneNumber: recipient,\n        message: messageContent,\n        mediaUrl: item.json.media_url,\n        mediaType: item.json.media_type\n      }\n    });\n  });\n}\n\nreturn items;"
+      },
+      "id": "process-templates",
+      "name": "Process Templates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mediaUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combineOperation": "all"
+        }
+      },
+      "id": "check-has-media",
+      "name": "Check Has Media",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 240]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "recipientPhoneNumber": "={{ $json.phoneNumber }}",
+        "message": "={{ $json.message }}"
+      },
+      "id": "send-text-message",
+      "name": "Send Text Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1340, 140],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMedia",
+        "recipientPhoneNumber": "={{ $json.phoneNumber }}",
+        "mediaType": "={{ $json.mediaType }}",
+        "mediaUrl": "={{ $json.mediaUrl }}",
+        "caption": "={{ $json.message }}"
+      },
+      "id": "send-media-message",
+      "name": "Send Media Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1340, 340],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "merge-send-results",
+      "name": "Merge Send Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1560, 240]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE scheduled_messages SET status = 'sent', sent_at = NOW() WHERE id = $1",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.messageId }}"
+            }
+          ]
+        }
+      },
+      "id": "update-message-status-sent",
+      "name": "Update Status: Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1780, 240],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE scheduled_messages SET status = 'failed', error_message = $1 WHERE id = $2",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.error.message || 'Unknown error' }}"
+            },
+            {
+              "parameter": "={{ $json.messageId }}"
+            }
+          ]
+        }
+      },
+      "id": "update-message-status-failed",
+      "name": "Update Status: Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1780, 440],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Check Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Messages": {
+      "main": [
+        [
+          {
+            "node": "Check Messages Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Messages Exist": {
+      "main": [
+        [
+          {
+            "node": "Process Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Templates": {
+      "main": [
+        [
+          {
+            "node": "Check Has Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Media": {
+      "main": [
+        [
+          {
+            "node": "Send Media Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Text Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Text Message": {
+      "main": [
+        [
+          {
+            "node": "Merge Send Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Media Message": {
+      "main": [
+        [
+          {
+            "node": "Merge Send Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Send Results": {
+      "main": [
+        [
+          {
+            "node": "Update Status: Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-14T00:00:00.000Z",
+  "versionId": "1"
+}

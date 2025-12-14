@@ -22,9 +22,13 @@ This project provides a **complete end-to-end solution** for building an AI-powe
 ### What This Solution Includes
 
 ✅ **Complete n8n Workflow** - Ready-to-import JSON configuration
-✅ **Multimodal Support** - Text, voice, images, and PDFs
+✅ **Multimodal Support** - Text, voice, images, PDFs, and videos
 ✅ **AI-Powered Responses** - Using OpenAI GPT-4
 ✅ **Conversation Memory** - Context-aware responses
+✅ **Human Handoff** - Transfer to live agents when needed ⭐ NEW
+✅ **Proactive Messaging** - Scheduled notifications and campaigns ⭐ NEW
+✅ **Voice Responses** - Text-to-speech audio replies ⭐ NEW
+✅ **Video Support** - Process and analyze video messages ⭐ NEW
 ✅ **RAG Support** - Knowledge base integration
 ✅ **Database Schema** - PostgreSQL schema for data storage
 ✅ **Deployment Guides** - Complete setup instructions
@@ -48,7 +52,34 @@ This project provides a **complete end-to-end solution** for building an AI-powe
 - **Voice Messages** - Automatic transcription with Whisper
 - **Images** - Visual analysis with GPT-4 Vision
 - **PDF Documents** - Text extraction and Q&A
+- **Video Messages** ⭐ NEW - Process and analyze videos
 - **Location & Contacts** - Handle special message types
+
+### 🎯 Enhanced Features (NEW!)
+
+- **Human Handoff** ⭐ - Transfer conversations to live agents
+  - Automatic escalation based on sentiment
+  - Slack, email, or CRM integration
+  - Agent availability management
+  - Performance tracking
+
+- **Proactive Messaging** ⭐ - Send scheduled notifications
+  - Order updates and shipping notifications
+  - Appointment reminders
+  - Marketing campaigns
+  - Template management
+
+- **Voice Responses** ⭐ - Send audio replies
+  - Text-to-speech with OpenAI TTS
+  - Multiple voice options
+  - User preferences
+  - Cost-efficient caching
+
+- **Video Support** ⭐ - Handle video messages
+  - Download and store videos
+  - AI-powered frame analysis
+  - Content recognition
+  - Automatic response generation
 
 ### 💾 Data Management
 
@@ -56,6 +87,8 @@ This project provides a **complete end-to-end solution** for building an AI-powe
 - **User Profiles** - Track user information and preferences
 - **Analytics** - Message stats, AI performance, user engagement
 - **Feedback System** - Collect user satisfaction ratings
+- **Handoff Tracking** - Monitor agent performance
+- **Campaign Analytics** - Track proactive message success
 
 ### 🚀 Production Features
 
@@ -408,20 +441,57 @@ See [Troubleshooting section in DEPLOYMENT.md](DEPLOYMENT.md#troubleshooting) fo
 
 ---
 
+## What's New in v2.0! 🎉
+
+We've added four major enhancements:
+
+### 1. Human Handoff
+- Automatically detect when AI can't help
+- Transfer to live agents via Slack, Email, or CRM
+- Track agent performance and response times
+- See **[FEATURES.md#human-handoff](FEATURES.md#1-human-handoff)** for full guide
+
+### 2. Proactive Messaging
+- Schedule individual messages or mass broadcasts
+- Send order updates, reminders, and notifications
+- Campaign management and analytics
+- See **[FEATURES.md#proactive-messaging](FEATURES.md#2-proactive-messaging)** for full guide
+
+### 3. Voice Responses
+- Convert text responses to audio using OpenAI TTS
+- 6 different voice options
+- User preferences and automatic mode
+- See **[FEATURES.md#voice-responses](FEATURES.md#3-voice-responses)** for full guide
+
+### 4. Video Support
+- Receive and analyze video messages
+- AI-powered frame extraction and analysis
+- Automatic content recognition
+- See **[FEATURES.md#video-support](FEATURES.md#4-video-support)** for full guide
+
+📖 **[Read the complete Enhanced Features Guide →](FEATURES.md)**
+
+---
+
 ## Roadmap
+
+### Recently Completed ✅
+
+- [x] **Human handoff** - Transfer to live agent
+- [x] **Voice replies** - Send audio responses
+- [x] **Video support** - Handle video messages
+- [x] **Scheduled messages** - Proactive notifications
 
 ### Planned Features
 
 - [ ] **Multi-language support** - Auto-translate conversations
-- [ ] **Sentiment analysis** - Detect frustrated users
-- [ ] **Human handoff** - Transfer to live agent
-- [ ] **Voice replies** - Send audio responses
+- [ ] **Sentiment analysis** - Real-time mood detection
 - [ ] **Interactive buttons** - WhatsApp button templates
 - [ ] **CRM integration** - Sync with Salesforce, HubSpot
 - [ ] **A/B testing** - Optimize response strategies
 - [ ] **Admin dashboard** - Web UI for monitoring
 - [ ] **Auto-categorization** - Tag conversations by topic
-- [ ] **Scheduled messages** - Proactive notifications
+- [ ] **Smart routing** - Route by product/department
 
 ### Contributing
 
