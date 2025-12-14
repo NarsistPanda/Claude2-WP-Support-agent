@@ -1,0 +1,717 @@
+{
+  "name": "WhatsApp AI Support Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "=GET",
+        "path": "whatsapp-webhook",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-verification",
+      "name": "Webhook Verification",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "whatsapp-webhook-verify"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-messages",
+      "name": "Webhook Messages",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 500],
+      "webhookId": "whatsapp-webhook-msg"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.query['hub.mode'] }}",
+              "rightValue": "subscribe",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "={{ $env.WHATSAPP_VERIFY_TOKEN }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combineOperation": "all"
+        },
+        "options": {}
+      },
+      "id": "verify-token-check",
+      "name": "Verify Token Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}"
+      },
+      "id": "respond-verification",
+      "name": "Respond Verification",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "respond-forbidden",
+      "name": "Respond Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1820, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message data from WhatsApp webhook payload\nconst items = [];\n\nfor (const item of $input.all()) {\n  const entry = item.json?.entry?.[0];\n  const changes = entry?.changes?.[0];\n  const value = changes?.value;\n  \n  if (!value?.messages) {\n    continue;\n  }\n  \n  for (const message of value.messages) {\n    const contact = value.contacts?.[0];\n    \n    items.push({\n      json: {\n        messageId: message.id,\n        from: message.from,\n        timestamp: message.timestamp,\n        type: message.type,\n        contactName: contact?.profile?.name || 'Unknown',\n        phoneNumberId: value.metadata?.phone_number_id,\n        businessAccountId: entry?.id,\n        \n        // Message content based on type\n        text: message.text?.body,\n        imageId: message.image?.id,\n        imageMimeType: message.image?.mime_type,\n        imageCaption: message.image?.caption,\n        audioId: message.audio?.id,\n        audioMimeType: message.audio?.mime_type,\n        documentId: message.document?.id,\n        documentMimeType: message.document?.mime_type,\n        documentFilename: message.document?.filename,\n        documentCaption: message.document?.caption,\n        videoId: message.video?.id,\n        videoMimeType: message.video?.mime_type,\n        videoCaption: message.video?.caption,\n        location: message.location,\n        \n        // Context (for replies)\n        contextMessageId: message.context?.id,\n        \n        // Raw message for debugging\n        rawMessage: message\n      }\n    });\n  }\n}\n\nreturn items;"
+      },
+      "id": "parse-message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combineOperation": "all"
+              },
+              "renameOutput": true,
+              "outputKey": "text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combineOperation": "all"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combineOperation": "all"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combineOperation": "all"
+              },
+              "renameOutput": true,
+              "outputKey": "document"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "message-router",
+      "name": "Message Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "mediaId": "={{ $json.audioId }}"
+      },
+      "id": "download-audio",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [900, 680],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "data",
+        "options": {
+          "language": "en"
+        }
+      },
+      "id": "transcribe-audio",
+      "name": "Transcribe Audio",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [1120, 680],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "mediaId": "={{ $json.imageId }}"
+      },
+      "id": "download-image",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [900, 820],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "imageUrl",
+                "imageUrl": "={{ 'data:' + $json.mimeType + ';base64,' + $binary.data.data }}"
+              },
+              {
+                "type": "text",
+                "text": "Analyze this image in detail. If there's a caption, consider it: {{ $json.imageCaption || 'No caption provided' }}"
+              }
+            ]
+          }
+        ],
+        "options": {
+          "maxTokens": 500
+        }
+      },
+      "id": "analyze-image",
+      "name": "Analyze Image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [1120, 820],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "mediaId": "={{ $json.documentId }}"
+      },
+      "id": "download-document",
+      "name": "Download Document",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [900, 960],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract text from PDF document\nconst items = [];\n\nfor (const item of $input.all()) {\n  const binaryData = item.binary?.data;\n  \n  if (!binaryData) {\n    items.push({\n      json: {\n        ...item.json,\n        extractedText: 'Unable to extract text from document',\n        processedContent: `User sent a document: ${item.json.documentFilename || 'unknown file'}`\n      }\n    });\n    continue;\n  }\n  \n  // Note: In production, use a proper PDF parser library\n  // For now, create a placeholder\n  items.push({\n    json: {\n      ...item.json,\n      extractedText: 'PDF content extraction requires additional setup',\n      processedContent: `User sent a PDF document named \"${item.json.documentFilename}\". ${item.json.documentCaption ? 'Caption: ' + item.json.documentCaption : ''}`\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "extract-pdf-text",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 960]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare processed content for all message types\nconst items = [];\n\nfor (const item of $input.all()) {\n  let processedContent = '';\n  \n  if (item.json.text) {\n    processedContent = item.json.text;\n  } else if (item.json.transcription) {\n    processedContent = `[Voice message transcription]: ${item.json.transcription}`;\n  } else if (item.json.imageAnalysis) {\n    processedContent = `[Image analysis]: ${item.json.imageAnalysis}`;\n  } else if (item.json.processedContent) {\n    processedContent = item.json.processedContent;\n  }\n  \n  items.push({\n    json: {\n      ...item.json,\n      processedContent\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "prepare-content",
+      "name": "Prepare Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 680]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT conversation_history FROM user_conversations WHERE phone_number = $1 ORDER BY created_at DESC LIMIT 1",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.from }}"
+            }
+          ]
+        }
+      },
+      "id": "load-conversation-history",
+      "name": "Load Conversation History",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [900, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge conversation history with current message\nconst items = [];\n\nfor (const item of $input.all()) {\n  const history = item.json.conversation_history || [];\n  const currentMessage = {\n    role: 'user',\n    content: item.json.processedContent,\n    timestamp: new Date().toISOString()\n  };\n  \n  // Keep last 10 messages for context\n  const contextMessages = [...history.slice(-10), currentMessage];\n  \n  items.push({\n    json: {\n      ...item.json,\n      conversationHistory: history,\n      contextMessages,\n      currentMessage\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "merge-context",
+      "name": "Merge Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 500]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.processedContent }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a helpful AI support assistant for n8n, a powerful workflow automation platform. Your role is to:\n\n1. Answer questions about n8n features, nodes, and workflows\n2. Help troubleshoot issues users face\n3. Provide clear, concise, and friendly responses\n4. Guide users to relevant documentation when needed\n5. Be patient and supportive\n\nKey information about n8n:\n- n8n is a workflow automation tool that lets you connect different services\n- It has a visual workflow editor with nodes\n- It supports over 400 integrations\n- It can be self-hosted or used in the cloud\n- Workflows are triggered by webhooks, schedules, or manual execution\n\nConversation context:\nUser: {{ $json.contactName }}\nPhone: {{ $json.from }}\n\nPrevious conversation:\n{{ $json.contextMessages ? $json.contextMessages.slice(0, -1).map(m => m.role + ': ' + m.content).join('\\n') : 'No previous conversation' }}\n\nRespond in a helpful, friendly tone. Keep responses concise (2-3 sentences max) since this is WhatsApp. If you need to provide detailed information, break it into multiple points."
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1340, 500]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 500
+        }
+      },
+      "id": "openai-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [1340, 640],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO user_conversations (phone_number, conversation_history, last_message, updated_at)\nVALUES ($1, $2, $3, NOW())\nON CONFLICT (phone_number) \nDO UPDATE SET \n  conversation_history = $2,\n  last_message = $3,\n  updated_at = NOW()",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.from }}"
+            },
+            {
+              "parameter": "={{ JSON.stringify([...($json.conversationHistory || []), { role: 'user', content: $json.processedContent, timestamp: new Date().toISOString() }, { role: 'assistant', content: $json.output, timestamp: new Date().toISOString() }]) }}"
+            },
+            {
+              "parameter": "={{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "id": "save-conversation",
+      "name": "Save Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1560, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "recipientPhoneNumber": "={{ $json.from }}",
+        "message": "={{ $json.output }}"
+      },
+      "id": "send-whatsapp-reply",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1820, 500],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-credentials",
+          "name": "WhatsApp Business Cloud"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "merge-processed-messages",
+      "name": "Merge Processed Messages",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1340, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Verification": {
+      "main": [
+        [
+          {
+            "node": "Verify Token Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Messages": {
+      "main": [
+        [
+          {
+            "node": "Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Token Check": {
+      "main": [
+        [
+          {
+            "node": "Respond Verification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Message Router",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Load Conversation History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Router": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Analyze Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Image": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Document": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Conversation History": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Context": {
+      "main": [
+        [
+          {
+            "node": "Merge Processed Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Processed Messages",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Processed Messages": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Save Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Conversation": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-14T00:00:00.000Z",
+  "versionId": "1"
+}
