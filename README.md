@@ -189,8 +189,12 @@ Send a WhatsApp message to your business number and get an AI response!
 
 ### Full Documentation
 
-📖 **[Complete Deployment Guide](DEPLOYMENT.md)** - Step-by-step instructions
+📖 **[Complete Deployment Guide (v2.0)](DEPLOYMENT-V2.md)** - Comprehensive step-by-step with all features
+📋 **[Deployment Checklist](DEPLOYMENT-CHECKLIST.md)** - Printable deployment tracker
+⚡ **[Quick Start Guide](QUICKSTART.md)** - 10-minute setup for testing
+🎯 **[Enhanced Features Guide](FEATURES.md)** - Human handoff, proactive messaging, voice & video
 🏗️ **[Architecture Documentation](ARCHITECTURE.md)** - System design details
+💡 **[Quick Reference](QUICK-REFERENCE.md)** - Essential commands and queries
 
 ---
 

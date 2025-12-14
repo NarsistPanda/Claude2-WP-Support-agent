@@ -1,8 +1,66 @@
 # Deployment Guide - n8n WhatsApp AI Support Agent
 
-This guide will walk you through deploying the complete WhatsApp AI Support Agent solution.
+**Quick navigation for deployment resources**
 
-## Table of Contents
+---
+
+## 🚀 Deployment Options
+
+### For Complete Step-by-Step Deployment with All Features
+
+👉 **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - **RECOMMENDED**
+
+Comprehensive guide covering:
+- ✅ All v2.0 enhanced features
+- ✅ Database setup (base + enhanced schemas)
+- ✅ Vector database configuration
+- ✅ All workflow deployments
+- ✅ Feature-by-feature integration guides
+- ✅ Production hardening
+- ✅ Monitoring and maintenance
+
+**Best for:** Production deployments, full feature set, step-by-step guidance
+
+---
+
+### For Quick Testing (10 Minutes)
+
+👉 **[QUICKSTART.md](QUICKSTART.md)**
+
+Fastest path to a working bot:
+- Local development setup
+- Basic features only
+- Using ngrok for webhook
+- Test with Meta's test number
+
+**Best for:** Trying it out, development, quick demos
+
+---
+
+### For Deployment Tracking
+
+👉 **[DEPLOYMENT-CHECKLIST.md](DEPLOYMENT-CHECKLIST.md)**
+
+Printable checklist:
+- Every deployment step
+- Verification checkpoints
+- Production readiness criteria
+- Post-deployment tasks
+
+**Best for:** Team deployments, ensuring nothing is missed, documentation
+
+---
+
+## 📚 Additional Resources
+
+- **[README.md](README.md)** - Project overview and features
+- **[FEATURES.md](FEATURES.md)** - Enhanced features detailed guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
+- **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Command reference
+
+---
+
+## Table of Contents (Legacy Guide - See DEPLOYMENT-V2.md for Complete Guide)
 
 1. [Prerequisites](#prerequisites)
 2. [WhatsApp Business API Setup](#whatsapp-business-api-setup)
@@ -14,6 +72,8 @@ This guide will walk you through deploying the complete WhatsApp AI Support Agen
 8. [Testing](#testing)
 9. [Production Deployment](#production-deployment)
 10. [Troubleshooting](#troubleshooting)
+
+**Note:** This legacy guide covers basic deployment. For the complete v2.0 deployment with all enhanced features (Human Handoff, Proactive Messaging, Voice Responses, Video Support), use **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** instead.
 
 ---
 
