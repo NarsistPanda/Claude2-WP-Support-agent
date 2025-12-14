@@ -55,7 +55,8 @@ Printable checklist:
 
 - **[README.md](README.md)** - Project overview and features
 - **[FEATURES.md](FEATURES.md)** - Enhanced features detailed guide
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
+- **[ARCHITECTURE-V2.md](ARCHITECTURE-V2.md)** - Complete v2.0 architecture
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Basic architecture overview
 - **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Command reference
 
 ---
@@ -845,9 +846,14 @@ After successful deployment:
 1. **Customize AI Prompt**: Edit the system message in the AI Agent node
 2. **Add Knowledge Base**: Insert your company's FAQs into `knowledge_base` table
 3. **Enable RAG**: Implement vector search for better answers
-4. **Add Analytics Dashboard**: Create Grafana dashboard
-5. **Human Handoff**: Integrate with customer support platform
+4. **Add v2.0 Enhanced Features** (Production Ready):
+   - See **[FEATURES.md](FEATURES.md)** for complete implementation guides:
+     - **Human Handoff** - Slack, Email, Custom webhooks
+     - **Proactive Messaging** - Campaigns, Templates, Scheduling
+     - **Voice Responses** - Text-to-speech with 6 voice options
+     - **Video Support** - Cloud storage + AI analysis
+   - Full deployment: **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)**
+5. **Add Analytics Dashboard**: Create Grafana dashboard
 6. **Multi-language**: Add language detection and translation
-7. **Template Messages**: Use WhatsApp templates for notifications
 
 Congratulations! Your WhatsApp AI Support Agent is now live! 🎉

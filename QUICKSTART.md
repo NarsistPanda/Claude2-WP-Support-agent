@@ -2,6 +2,27 @@
 
 Get your WhatsApp AI Support Agent up and running in just 10 minutes!
 
+## ⚠️ Important Note
+
+This quick start guide is designed for **testing and development only**. It sets up the **basic features**:
+- ✅ Text message handling
+- ✅ Voice transcription (Whisper)
+- ✅ Image analysis (GPT-4 Vision)
+- ✅ Basic conversation memory
+- ✅ AI responses
+
+**For production deployment with all v2.0 enhanced features**, use the comprehensive deployment guide:
+
+### v2.0 Enhanced Features (Production)
+- 🎯 **Human Handoff** - Transfer to live agents when needed
+- 📢 **Proactive Messaging** - Scheduled notifications and campaigns
+- 🎙️ **Voice Responses** - Text-to-speech audio replies
+- 🎥 **Video Support** - Process and analyze video messages
+
+👉 **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - Complete step-by-step deployment guide for all features
+
+---
+
 ## Prerequisites Checklist
 
 Before you start, have these ready:
@@ -308,9 +329,13 @@ Your WhatsApp AI Support Agent is now live!
    - Add your company knowledge to database
    - Adjust response length and style
 
-4. **Add More Features**
+4. **Add v2.0 Enhanced Features**
+   - See **[FEATURES.md](FEATURES.md)** for detailed guides on:
+     - Human Handoff (Slack, Email, Custom integrations)
+     - Proactive Messaging (Campaigns, Templates, Scheduling)
+     - Voice Responses (Text-to-speech with 6 voice options)
+     - Video Support (Cloud storage + AI analysis)
    - Enable RAG (Retrieval Augmented Generation)
-   - Add human handoff capability
    - Integrate with your CRM
    - Add analytics dashboard
 
@@ -355,8 +380,15 @@ See [DEPLOYMENT.md#troubleshooting](DEPLOYMENT.md#troubleshooting) for more help
 
 ## Resources
 
-- 📖 [Full Deployment Guide](DEPLOYMENT.md) - Complete setup for production
-- 🏗️ [Architecture Documentation](ARCHITECTURE.md) - How it all works
+### Documentation
+- 📖 **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - Complete v2.0 deployment guide with all features
+- 📋 **[DEPLOYMENT-CHECKLIST.md](DEPLOYMENT-CHECKLIST.md)** - Printable deployment tracker
+- 🎯 **[FEATURES.md](FEATURES.md)** - Enhanced features implementation guide
+- 🏗️ **[ARCHITECTURE-V2.md](ARCHITECTURE-V2.md)** - Complete v2.0 architecture
+- ⚡ **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Essential commands and queries
+- 📖 [DEPLOYMENT.md](DEPLOYMENT.md) - Navigation hub for all deployment docs
+
+### Community
 - 💬 [n8n Community](https://community.n8n.io) - Get help from the community
 
 ---

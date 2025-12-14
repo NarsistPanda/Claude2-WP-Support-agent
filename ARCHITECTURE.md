@@ -320,15 +320,54 @@ n8n Cloud → External APIs (OpenAI, WhatsApp)
 - Error tracking (Sentry)
 - Cost monitoring (AI API usage)
 
-## Future Enhancements
+## What's New in v2.0! 🎉
+
+The following features have been implemented and are now available:
+
+### ✅ Implemented Features
+
+1. **Human Handoff** ✅ - Transfer to live agent when needed
+   - Automatic escalation based on keywords, sentiment, or unresolved queries
+   - Slack, Email, and Custom Webhook integrations
+   - Agent availability management
+   - See [FEATURES.md](FEATURES.md#1-human-handoff)
+
+2. **Proactive Messaging** ✅ - Send notifications and campaigns
+   - Schedule individual messages or bulk broadcasts
+   - Template management with variables
+   - Campaign tracking and analytics
+   - See [FEATURES.md](FEATURES.md#2-proactive-messaging)
+
+3. **Voice Responses** ✅ - Send audio replies
+   - Text-to-speech with 6 voice options
+   - Per-user preferences
+   - Cost tracking and optimization
+   - See [FEATURES.md](FEATURES.md#3-voice-responses)
+
+4. **Video Support** ✅ - Handle and analyze video messages
+   - AI-powered frame analysis
+   - Cloud storage integration (S3, GCS, Azure)
+   - Content recognition
+   - See [FEATURES.md](FEATURES.md#4-video-support)
+
+### 📚 Complete v2.0 Architecture
+
+For the complete v2.0 architecture including all enhanced features:
+
+👉 **[ARCHITECTURE-V2.md](ARCHITECTURE-V2.md)** - Complete architecture documentation
+
+This includes:
+- All 4 enhanced features architecture
+- Complete database schema (18 tables)
+- All 3 workflows architecture
+- Integration architecture
+- Security & scalability details
+- Deployment architectures
+
+### 🔮 Future Enhancements
 
 1. **Multi-language Support**: Automatic translation
-2. **Sentiment Analysis**: Detect and escalate negative sentiment
-3. **Human Handoff**: Transfer to live agent when needed
-4. **Proactive Messaging**: Send notifications and updates
-5. **Voice Responses**: Send audio replies
-6. **Video Support**: Handle video messages
-7. **Interactive Elements**: Buttons, lists, carousels
-8. **A/B Testing**: Optimize response strategies
-9. **Analytics Dashboard**: Real-time insights
-10. **CRM Integration**: Sync with Salesforce, HubSpot, etc.
+2. **Interactive Elements**: Buttons, lists, carousels
+3. **A/B Testing**: Optimize response strategies
+4. **Analytics Dashboard**: Real-time insights web UI
+5. **CRM Integration**: Native Salesforce, HubSpot connectors
