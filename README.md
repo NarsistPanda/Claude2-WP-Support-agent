@@ -190,6 +190,7 @@ Send a WhatsApp message to your business number and get an AI response!
 ### Full Documentation
 
 📖 **[Complete Deployment Guide (v2.0)](DEPLOYMENT-V2.md)** - Comprehensive step-by-step with all features
+🐳 **[Docker Compose Deployment](DOCKER-DEPLOYMENT.md)** - Production-ready Docker deployment
 📋 **[Deployment Checklist](DEPLOYMENT-CHECKLIST.md)** - Printable deployment tracker
 ⚡ **[Quick Start Guide](QUICKSTART.md)** - 10-minute setup for testing
 🎯 **[Enhanced Features Guide](FEATURES.md)** - Human handoff, proactive messaging, voice & video

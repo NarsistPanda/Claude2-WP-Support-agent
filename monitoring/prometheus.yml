@@ -1,0 +1,61 @@
+# Prometheus Configuration for WhatsApp Support Agent Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'whatsapp-support-agent'
+    environment: 'production'
+
+# Alerting configuration (optional - requires Alertmanager)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Scrape configurations
+scrape_configs:
+  # n8n Metrics
+  - job_name: 'n8n'
+    static_configs:
+      - targets: ['WPSupport_n8n:5678']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # PostgreSQL Metrics (requires postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['WPSupport_postgres:5432']
+    scrape_interval: 30s
+
+  # Redis Metrics (requires redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['WPSupport_redis:6379']
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+
+  # Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['WPSupport_grafana:3000']
+    scrape_interval: 60s
+
+  # MinIO (if storage profile is enabled)
+  - job_name: 'minio'
+    metrics_path: '/minio/v2/metrics/cluster'
+    static_configs:
+      - targets: ['WPSupport_minio:9000']
+    scrape_interval: 60s
+
+  # Qdrant (if rag profile is enabled)
+  - job_name: 'qdrant'
+    static_configs:
+      - targets: ['WPSupport_qdrant:6333']
+    metrics_path: '/metrics'
+    scrape_interval: 60s

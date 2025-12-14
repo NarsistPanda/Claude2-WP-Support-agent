@@ -1,0 +1,38 @@
+apiVersion: 1
+
+datasources:
+  # Prometheus
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://WPSupport_prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: '15s'
+      queryTimeout: '60s'
+
+  # PostgreSQL
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: WPSupport_postgres:5432
+    database: ${DB_NAME:-whatsapp_support_agent}
+    user: ${DB_USER:-n8n_user}
+    secureJsonData:
+      password: ${DB_PASSWORD}
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 10
+      maxIdleConns: 10
+      connMaxLifetime: 14400
+    editable: true
+
+  # Redis (requires redis-datasource plugin)
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://WPSupport_redis:6379
+    secureJsonData:
+      password: ${REDIS_PASSWORD:-}
+    editable: true

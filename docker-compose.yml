@@ -1,14 +1,32 @@
 version: '3.8'
 
+#================================================================================
+# WhatsApp AI Support Agent - Docker Compose Configuration
+#================================================================================
+# This docker-compose file includes all services needed for the v2.0 solution:
+# - Core Services: n8n, PostgreSQL, Redis
+# - Storage: MinIO (S3-compatible for videos/media)
+# - Vector DB: Qdrant (for RAG)
+# - Reverse Proxy: Nginx + Certbot
+# - Monitoring: Prometheus + Grafana
+# - Development Tools: pgAdmin, Redis Commander
+# - Backup: Automated PostgreSQL backups
+#================================================================================
+
 services:
-  # n8n workflow automation
+  #==============================================================================
+  # CORE SERVICES
+  #==============================================================================
+
+  # n8n Workflow Automation Engine
   n8n:
     image: n8nio/n8n:latest
-    container_name: n8n
+    container_name: WPSupport_n8n
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      - "${N8N_PORT:-5678}:5678"
     environment:
+      # Basic Configuration
       - N8N_HOST=${N8N_HOST:-localhost}
       - N8N_PORT=5678
       - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
@@ -17,19 +35,20 @@ services:
       - GENERIC_TIMEZONE=${TIMEZONE:-UTC}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
 
-      # Database configuration
+      # Database Configuration
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_HOST=WPSupport_postgres
       - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${DB_NAME:-n8n}
-      - DB_POSTGRESDB_USER=${DB_USER:-n8n}
+      - DB_POSTGRESDB_DATABASE=${DB_NAME:-whatsapp_support_agent}
+      - DB_POSTGRESDB_USER=${DB_USER:-n8n_user}
       - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
 
-      # Queue mode (for high traffic)
-      - EXECUTIONS_MODE=${EXECUTIONS_MODE:-regular}
-      - QUEUE_BULL_REDIS_HOST=redis
+      # Queue Mode (for high traffic and v2.0 proactive messaging)
+      - EXECUTIONS_MODE=${EXECUTIONS_MODE:-queue}
+      - QUEUE_BULL_REDIS_HOST=WPSupport_redis
       - QUEUE_BULL_REDIS_PORT=6379
       - QUEUE_BULL_REDIS_DB=0
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
 
       # Security
       - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
@@ -37,48 +56,82 @@ services:
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
 
       # Logging
-      - N8N_LOG_LEVEL=${LOG_LEVEL:-info}
-      - N8N_LOG_OUTPUT=${N8N_LOG_OUTPUT:-console}
+      - N8N_LOG_LEVEL=${N8N_LOG_LEVEL:-info}
+      - N8N_LOG_OUTPUT=${N8N_LOG_OUTPUT:-console,file}
+      - N8N_LOG_FILE_LOCATION=/home/node/.n8n/logs/
 
-      # Performance
-      - N8N_PAYLOAD_SIZE_MAX=${N8N_PAYLOAD_SIZE_MAX:-16}
+      # Performance & Limits (important for video/media handling)
+      - N8N_PAYLOAD_SIZE_MAX=${N8N_PAYLOAD_SIZE_MAX:-32}
       - N8N_METRICS=true
+      - N8N_METRICS_PREFIX=n8n_
+
+      # Execution Settings
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - EXECUTIONS_DATA_PRUNE=true
+
+      # Workflow Settings
+      - WORKFLOWS_DEFAULT_NAME=WhatsApp Support Workflow
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
 
     volumes:
       - n8n_data:/home/node/.n8n
+      - n8n_files:/files
       - ./whatsapp-support-agent-workflow.json:/home/node/workflows/whatsapp-support-agent.json:ro
+      - ./workflows/proactive-messaging-workflow.json:/home/node/workflows/proactive-messaging.json:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - n8n-network
+      - wpsupport-network
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:5678/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
-  # PostgreSQL database
+  #==============================================================================
+  # DATABASE SERVICES
+  #==============================================================================
+
+  # PostgreSQL Database (with pgvector extension for RAG)
   postgres:
-    image: postgres:15-alpine
-    container_name: postgres
+    image: ankane/pgvector:latest
+    container_name: WPSupport_postgres
     restart: unless-stopped
     environment:
       - POSTGRES_DB=${DB_NAME:-whatsapp_support_agent}
       - POSTGRES_USER=${DB_USER:-n8n_user}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_INITDB_ARGS="-E UTF8"
+      - POSTGRES_INITDB_ARGS=-E UTF8 --locale=en_US.UTF-8
       - PGDATA=/var/lib/postgresql/data/pgdata
+      # Performance tuning
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=512MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=2GB
+      - POSTGRES_WORK_MEM=16MB
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # Initialize both base and enhanced schemas
+      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-base-schema.sql:ro
+      - ./database-schema-enhanced.sql:/docker-entrypoint-initdb.d/02-enhanced-schema.sql:ro
+      - ./backups:/backups
     networks:
-      - n8n-network
+      - wpsupport-network
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-n8n_user} -d ${DB_NAME:-whatsapp_support_agent}"]
       interval: 10s
@@ -90,133 +143,470 @@ services:
       - "-c"
       - "max_connections=200"
       - "-c"
-      - "shared_buffers=256MB"
+      - "shared_buffers=512MB"
       - "-c"
-      - "effective_cache_size=1GB"
+      - "effective_cache_size=2GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "default_statistics_target=100"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
 
-  # Redis for caching and queue
+  # Redis for Caching and Queue Management
   redis:
     image: redis:7-alpine
-    container_name: redis
+    container_name: WPSupport_redis
     restart: unless-stopped
     command: >
       redis-server
       --appendonly yes
       --appendfsync everysec
-      --maxmemory 256mb
+      --maxmemory ${REDIS_MAXMEMORY:-512mb}
       --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --requirepass ${REDIS_PASSWORD:-}
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
-      - n8n-network
+      - wpsupport-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
-  # Nginx reverse proxy (optional, for production)
+  # Qdrant Vector Database (for RAG - Retrieval Augmented Generation)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: WPSupport_qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - wpsupport-network
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - rag
+      - production
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  #==============================================================================
+  # STORAGE SERVICES (for v2.0 Video Support)
+  #==============================================================================
+
+  # MinIO - S3-Compatible Object Storage (for videos, media, voice files)
+  minio:
+    image: minio/minio:latest
+    container_name: WPSupport_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_BROWSER=on
+      - MINIO_DOMAIN=${MINIO_DOMAIN:-localhost}
+    volumes:
+      - minio_data:/data
+    networks:
+      - wpsupport-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - storage
+      - production
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # MinIO Client (for initial bucket setup)
+  minio-client:
+    image: minio/mc:latest
+    container_name: WPSupport_minio_client
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - wpsupport-network
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc alias set myminio http://WPSupport_minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin123};
+      /usr/bin/mc mb myminio/whatsapp-videos --ignore-existing;
+      /usr/bin/mc mb myminio/whatsapp-voice --ignore-existing;
+      /usr/bin/mc mb myminio/whatsapp-media --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/whatsapp-videos;
+      /usr/bin/mc anonymous set download myminio/whatsapp-voice;
+      /usr/bin/mc anonymous set download myminio/whatsapp-media;
+      echo 'MinIO buckets created successfully';
+      exit 0;
+      "
+    profiles:
+      - storage
+      - production
+
+  #==============================================================================
+  # REVERSE PROXY & SSL
+  #==============================================================================
+
+  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: nginx
+    container_name: WPSupport_nginx
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - certbot_data:/var/www/certbot:ro
+      - nginx_logs:/var/log/nginx
     depends_on:
       - n8n
     networks:
-      - n8n-network
+      - wpsupport-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     profiles:
       - production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
-  # Certbot for SSL certificates (optional, for production)
+  # Certbot for SSL Certificate Management
   certbot:
     image: certbot/certbot:latest
-    container_name: certbot
+    container_name: WPSupport_certbot
     volumes:
       - certbot_data:/var/www/certbot
       - ./nginx/ssl:/etc/letsencrypt
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
     profiles:
       - production
 
-  # PgAdmin for database management (optional, for development)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: pgadmin
+  #==============================================================================
+  # MONITORING & OBSERVABILITY
+  #==============================================================================
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: WPSupport_prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - wpsupport-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - monitoring
+      - production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Grafana - Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: WPSupport_grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=redis-datasource,postgres-datasource
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+      - postgres
+    networks:
+      - wpsupport-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - monitoring
+      - production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  #==============================================================================
+  # BACKUP SERVICES
+  #==============================================================================
+
+  # Automated PostgreSQL Backup
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:latest
+    container_name: WPSupport_postgres_backup
     restart: unless-stopped
     environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@admin.com}
+      - POSTGRES_HOST=WPSupport_postgres
+      - POSTGRES_DB=${DB_NAME:-whatsapp_support_agent}
+      - POSTGRES_USER=${DB_USER:-n8n_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - SCHEDULE=${BACKUP_SCHEDULE:-@daily}
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-7}
+      - BACKUP_KEEP_WEEKS=${BACKUP_KEEP_WEEKS:-4}
+      - BACKUP_KEEP_MONTHS=${BACKUP_KEEP_MONTHS:-6}
+      - HEALTHCHECK_PORT=8080
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - wpsupport-network
+    profiles:
+      - backup
+      - production
+
+  #==============================================================================
+  # DEVELOPMENT & MANAGEMENT TOOLS
+  #==============================================================================
+
+  # pgAdmin - PostgreSQL Management UI
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: WPSupport_pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@wpsupport.local}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
       - PGADMIN_LISTEN_PORT=80
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
     ports:
-      - "8080:80"
+      - "${PGADMIN_PORT:-8080}:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
     depends_on:
       - postgres
     networks:
-      - n8n-network
+      - wpsupport-network
     profiles:
       - development
+      - tools
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
-  # Redis Commander for Redis management (optional, for development)
+  # Redis Commander - Redis Management UI
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: redis-commander
+    container_name: WPSupport_redis_commander
     restart: unless-stopped
     environment:
-      - REDIS_HOSTS=local:redis:6379
+      - REDIS_HOSTS=local:WPSupport_redis:6379:0:${REDIS_PASSWORD:-}
+      - HTTP_USER=${REDIS_COMMANDER_USER:-admin}
+      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-admin}
     ports:
-      - "8081:8081"
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
     depends_on:
       - redis
     networks:
-      - n8n-network
+      - wpsupport-network
     profiles:
       - development
+      - tools
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
 
-  # Qdrant vector database (optional, for RAG)
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: qdrant
-    restart: unless-stopped
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - n8n-network
-    environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
-    profiles:
-      - rag
-
+#==============================================================================
+# VOLUMES
+#==============================================================================
 volumes:
+  # Core service volumes
   n8n_data:
     driver: local
+    name: wpsupport_n8n_data
+  n8n_files:
+    driver: local
+    name: wpsupport_n8n_files
   postgres_data:
     driver: local
+    name: wpsupport_postgres_data
   redis_data:
     driver: local
-  pgadmin_data:
-    driver: local
+    name: wpsupport_redis_data
   qdrant_data:
     driver: local
+    name: wpsupport_qdrant_data
+
+  # Storage volumes
+  minio_data:
+    driver: local
+    name: wpsupport_minio_data
+
+  # Proxy & SSL volumes
   certbot_data:
     driver: local
+    name: wpsupport_certbot_data
+  nginx_logs:
+    driver: local
+    name: wpsupport_nginx_logs
 
+  # Monitoring volumes
+  prometheus_data:
+    driver: local
+    name: wpsupport_prometheus_data
+  grafana_data:
+    driver: local
+    name: wpsupport_grafana_data
+
+  # Development tools volumes
+  pgadmin_data:
+    driver: local
+    name: wpsupport_pgadmin_data
+
+#==============================================================================
+# NETWORKS
+#==============================================================================
 networks:
-  n8n-network:
+  wpsupport-network:
     driver: bridge
+    name: wpsupport_network
     ipam:
+      driver: default
       config:
         - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+
+#==============================================================================
+# USAGE INSTRUCTIONS
+#==============================================================================
+#
+# QUICK START (Development):
+#   docker-compose up -d
+#
+# WITH RAG (Vector Search):
+#   docker-compose --profile rag up -d
+#
+# WITH STORAGE (Video Support):
+#   docker-compose --profile storage up -d
+#
+# WITH MONITORING:
+#   docker-compose --profile monitoring up -d
+#
+# WITH ALL FEATURES (Production):
+#   docker-compose --profile production up -d
+#
+# WITH DEVELOPMENT TOOLS:
+#   docker-compose --profile development up -d
+#
+# FULL PRODUCTION DEPLOYMENT:
+#   docker-compose --profile production --profile storage --profile rag --profile monitoring --profile backup up -d
+#
+# VIEW LOGS:
+#   docker-compose logs -f [service_name]
+#
+# CHECK STATUS:
+#   docker-compose ps
+#
+# STOP ALL:
+#   docker-compose down
+#
+# REMOVE ALL DATA (DANGEROUS):
+#   docker-compose down -v
+#
+#==============================================================================
