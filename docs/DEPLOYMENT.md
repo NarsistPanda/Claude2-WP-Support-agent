@@ -8,7 +8,7 @@
 
 ### For Complete Step-by-Step Deployment with All Features
 
-👉 **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - **RECOMMENDED**
+👉 **DEPLOYMENT-V2.md(DEPLOYMENT-V2.md)** - **RECOMMENDED**
 
 Comprehensive guide covering:
 - ✅ All v2.0 enhanced features
@@ -54,9 +54,9 @@ Printable checklist:
 ## 📚 Additional Resources
 
 - **[README.md](README.md)** - Project overview and features
-- **[FEATURES.md](FEATURES.md)** - Enhanced features detailed guide
+- **FEATURES.md(FEATURES.md)** - Enhanced features detailed guide
 - **[ARCHITECTURE-V2.md](ARCHITECTURE-V2.md)** - Complete v2.0 architecture
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Basic architecture overview
+- **ARCHITECTURE.md(ARCHITECTURE.md)** - Basic architecture overview
 - **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Command reference
 
 ---
@@ -74,7 +74,7 @@ Printable checklist:
 9. [Production Deployment](#production-deployment)
 10. [Troubleshooting](#troubleshooting)
 
-**Note:** This legacy guide covers basic deployment. For the complete v2.0 deployment with all enhanced features (Human Handoff, Proactive Messaging, Voice Responses, Video Support), use **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** instead.
+**Note:** This legacy guide covers basic deployment. For the complete v2.0 deployment with all enhanced features (Human Handoff, Proactive Messaging, Voice Responses, Video Support), use **DEPLOYMENT-V2.md(DEPLOYMENT-V2.md)** instead.
 
 ---
 
@@ -847,12 +847,12 @@ After successful deployment:
 2. **Add Knowledge Base**: Insert your company's FAQs into `knowledge_base` table
 3. **Enable RAG**: Implement vector search for better answers
 4. **Add v2.0 Enhanced Features** (Production Ready):
-   - See **[FEATURES.md](FEATURES.md)** for complete implementation guides:
+   - See **FEATURES.md(FEATURES.md)** for complete implementation guides:
      - **Human Handoff** - Slack, Email, Custom webhooks
      - **Proactive Messaging** - Campaigns, Templates, Scheduling
      - **Voice Responses** - Text-to-speech with 6 voice options
      - **Video Support** - Cloud storage + AI analysis
-   - Full deployment: **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)**
+   - Full deployment: **DEPLOYMENT-V2.md(DEPLOYMENT-V2.md)**
 5. **Add Analytics Dashboard**: Create Grafana dashboard
 6. **Multi-language**: Add language detection and translation
 

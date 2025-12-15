@@ -330,25 +330,25 @@ The following features have been implemented and are now available:
    - Automatic escalation based on keywords, sentiment, or unresolved queries
    - Slack, Email, and Custom Webhook integrations
    - Agent availability management
-   - See [FEATURES.md](FEATURES.md#1-human-handoff)
+   - See FEATURES.md(FEATURES.md#1-human-handoff)
 
 2. **Proactive Messaging** ✅ - Send notifications and campaigns
    - Schedule individual messages or bulk broadcasts
    - Template management with variables
    - Campaign tracking and analytics
-   - See [FEATURES.md](FEATURES.md#2-proactive-messaging)
+   - See FEATURES.md(FEATURES.md#2-proactive-messaging)
 
 3. **Voice Responses** ✅ - Send audio replies
    - Text-to-speech with 6 voice options
    - Per-user preferences
    - Cost tracking and optimization
-   - See [FEATURES.md](FEATURES.md#3-voice-responses)
+   - See FEATURES.md(FEATURES.md#3-voice-responses)
 
 4. **Video Support** ✅ - Handle and analyze video messages
    - AI-powered frame analysis
    - Cloud storage integration (S3, GCS, Azure)
    - Content recognition
-   - See [FEATURES.md](FEATURES.md#4-video-support)
+   - See FEATURES.md(FEATURES.md#4-video-support)
 
 ### 📚 Complete v2.0 Architecture
 

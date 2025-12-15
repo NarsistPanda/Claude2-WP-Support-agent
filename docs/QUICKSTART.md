@@ -19,7 +19,7 @@ This quick start guide is designed for **testing and development only**. It sets
 - 🎙️ **Voice Responses** - Text-to-speech audio replies
 - 🎥 **Video Support** - Process and analyze video messages
 
-👉 **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - Complete step-by-step deployment guide for all features
+👉 **DEPLOYMENT-V2.md(DEPLOYMENT-V2.md)** - Complete step-by-step deployment guide for all features
 
 ---
 
@@ -322,7 +322,7 @@ Your WhatsApp AI Support Agent is now live!
    - Get a VPS (DigitalOcean, AWS, etc.)
    - Get a domain name
    - Setup SSL certificate
-   - See [DEPLOYMENT.md](DEPLOYMENT.md) for details
+   - See DEPLOYMENT.md(DEPLOYMENT.md) for details
 
 3. **Customize the Bot**
    - Edit system prompt in AI Agent node
@@ -330,7 +330,7 @@ Your WhatsApp AI Support Agent is now live!
    - Adjust response length and style
 
 4. **Add v2.0 Enhanced Features**
-   - See **[FEATURES.md](FEATURES.md)** for detailed guides on:
+   - See **FEATURES.md(FEATURES.md)** for detailed guides on:
      - Human Handoff (Slack, Email, Custom integrations)
      - Proactive Messaging (Campaigns, Templates, Scheduling)
      - Voice Responses (Text-to-speech with 6 voice options)
@@ -381,12 +381,12 @@ See [DEPLOYMENT.md#troubleshooting](DEPLOYMENT.md#troubleshooting) for more help
 ## Resources
 
 ### Documentation
-- 📖 **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - Complete v2.0 deployment guide with all features
+- 📖 **DEPLOYMENT-V2.md(DEPLOYMENT-V2.md)** - Complete v2.0 deployment guide with all features
 - 📋 **[DEPLOYMENT-CHECKLIST.md](DEPLOYMENT-CHECKLIST.md)** - Printable deployment tracker
-- 🎯 **[FEATURES.md](FEATURES.md)** - Enhanced features implementation guide
+- 🎯 **FEATURES.md(FEATURES.md)** - Enhanced features implementation guide
 - 🏗️ **[ARCHITECTURE-V2.md](ARCHITECTURE-V2.md)** - Complete v2.0 architecture
 - ⚡ **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Essential commands and queries
-- 📖 [DEPLOYMENT.md](DEPLOYMENT.md) - Navigation hub for all deployment docs
+- 📖 DEPLOYMENT.md(DEPLOYMENT.md) - Navigation hub for all deployment docs
 
 ### Community
 - 💬 [n8n Community](https://community.n8n.io) - Get help from the community

@@ -1174,7 +1174,7 @@ After deployment:
 **Congratulations!** You now have a production-ready WhatsApp AI Support Agent running on Azure! 🎉🚀
 
 For support, refer to:
-- [DEPLOYMENT-V2.md](DEPLOYMENT-V2.md) - General deployment guide
+- DEPLOYMENT-V2.md(DEPLOYMENT-V2.md) - General deployment guide
 - [DOCKER-DEPLOYMENT.md](DOCKER-DEPLOYMENT.md) - Docker deployment
-- [FEATURES.md](FEATURES.md) - v2.0 features documentation
+- FEATURES.md(FEATURES.md) - v2.0 features documentation
 - [TROUBLESHOOTING.md](azure/TROUBLESHOOTING.md) - Azure-specific troubleshooting

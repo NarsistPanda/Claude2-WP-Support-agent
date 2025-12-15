@@ -1605,7 +1605,7 @@ Use this checklist to ensure everything is set up correctly:
 
 ## Support & Resources
 
-- **Documentation**: [README.md](README.md), [FEATURES.md](FEATURES.md), [QUICK-REFERENCE.md](QUICK-REFERENCE.md)
+- **Documentation**: [README.md](README.md), FEATURES.md(FEATURES.md), [QUICK-REFERENCE.md](QUICK-REFERENCE.md)
 - **n8n Community**: https://community.n8n.io
 - **WhatsApp Business Docs**: https://developers.facebook.com/docs/whatsapp
 - **OpenAI API Docs**: https://platform.openai.com/docs
@@ -1624,4 +1624,4 @@ Your system is now ready to handle:
 - ✅ Video message analysis
 - ✅ Complete analytics and monitoring
 
-For ongoing support, refer to the [QUICK-REFERENCE.md](QUICK-REFERENCE.md) for common commands and [FEATURES.md](FEATURES.md) for feature-specific guides.
+For ongoing support, refer to the [QUICK-REFERENCE.md](QUICK-REFERENCE.md) for common commands and FEATURES.md(FEATURES.md) for feature-specific guides.

@@ -396,7 +396,7 @@ For Azure-specific issues:
 
 For application issues:
 1. Check [TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
-2. Review [FEATURES.md](../FEATURES.md)
+2. Review [FEATURES.md](../docs/FEATURES.md)
 3. Check n8n execution logs
 
 ---

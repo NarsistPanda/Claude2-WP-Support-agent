@@ -189,14 +189,14 @@ Send a WhatsApp message to your business number and get an AI response!
 
 ### Full Documentation
 
-📖 **[Complete Deployment Guide (v2.0)](DEPLOYMENT-V2.md)** - Comprehensive step-by-step with all features
-🐳 **[Docker Compose Deployment](DOCKER-DEPLOYMENT.md)** - Production-ready Docker deployment
-☁️ **[Azure Deployment Guide](AZURE-DEPLOYMENT.md)** - Complete Azure deployment (ACI, AKS, App Service)
-📋 **[Deployment Checklist](DEPLOYMENT-CHECKLIST.md)** - Printable deployment tracker
-⚡ **[Quick Start Guide](QUICKSTART.md)** - 10-minute setup for testing
-🎯 **[Enhanced Features Guide](FEATURES.md)** - Human handoff, proactive messaging, voice & video
-🏗️ **[Architecture Documentation](ARCHITECTURE.md)** - System design details
-💡 **[Quick Reference](QUICK-REFERENCE.md)** - Essential commands and queries
+📖 **[Complete Deployment Guide (v2.0)](docs/DEPLOYMENT-V2.md)** - Comprehensive step-by-step with all features
+🐳 **[Docker Compose Deployment](docs/DOCKER-DEPLOYMENT.md)** - Production-ready Docker deployment
+☁️ **[Azure Deployment Guide](docs/AZURE-DEPLOYMENT.md)** - Complete Azure deployment (ACI, AKS, App Service)
+📋 **[Deployment Checklist](docs/DEPLOYMENT-CHECKLIST.md)** - Printable deployment tracker
+⚡ **[Quick Start Guide](docs/QUICKSTART.md)** - 10-minute setup for testing
+🎯 **[Enhanced Features Guide](docs/FEATURES.md)** - Human handoff, proactive messaging, voice & video
+🏗️ **[Architecture Documentation](docs/ARCHITECTURE.md)** - System design details
+💡 **[Quick Reference](docs/QUICK-REFERENCE.md)** - Essential commands and queries
 
 ---
 

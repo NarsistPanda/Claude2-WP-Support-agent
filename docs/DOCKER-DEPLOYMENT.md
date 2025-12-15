@@ -753,8 +753,8 @@ docker stats $(docker-compose ps -q)
 8. ✅ Configure automated backups
 
 For detailed deployment instructions, see:
-- **[DEPLOYMENT-V2.md](DEPLOYMENT-V2.md)** - Complete v2.0 deployment
-- **[FEATURES.md](FEATURES.md)** - v2.0 features implementation
+- **DEPLOYMENT-V2.md(DEPLOYMENT-V2.md)** - Complete v2.0 deployment
+- **FEATURES.md(FEATURES.md)** - v2.0 features implementation
 - **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Command reference
 
 ---

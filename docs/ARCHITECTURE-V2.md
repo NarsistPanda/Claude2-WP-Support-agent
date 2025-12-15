@@ -1138,5 +1138,5 @@ The WhatsApp AI Support Agent v2.0 architecture is designed for:
 
 The architecture supports multiple deployment models from single-server to high-availability clusters, making it suitable for startups to enterprises.
 
-For detailed deployment instructions, see [DEPLOYMENT-V2.md](DEPLOYMENT-V2.md).
-For component-specific guides, see [FEATURES.md](FEATURES.md).
+For detailed deployment instructions, see DEPLOYMENT-V2.md(DEPLOYMENT-V2.md).
+For component-specific guides, see FEATURES.md(FEATURES.md).
