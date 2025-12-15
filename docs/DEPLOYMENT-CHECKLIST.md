@@ -90,14 +90,14 @@ cat .env | grep -E "WHATSAPP_|OPENAI_|DB_|N8N_" | head -20
 - [ ] Check logs: `docker-compose logs postgres | tail -20`
 
 ### Base Schema
-- [ ] Copy base schema: `docker cp database-schema.sql postgres:/tmp/`
+- [ ] Copy base schema: `docker cp db/database-schema.sql postgres:/tmp/`
 - [ ] Execute base schema: `docker-compose exec postgres psql -U n8n_user -d whatsapp_support_agent -f /tmp/database-schema.sql`
 - [ ] Verify tables: `docker-compose exec postgres psql -U n8n_user -d whatsapp_support_agent -c "\dt"`
 - [ ] Check sample data: Knowledge base entries visible
 - [ ] Check sample data: Message templates visible
 
 ### Enhanced Schema
-- [ ] Copy enhanced schema: `docker cp database-schema-enhanced.sql postgres:/tmp/`
+- [ ] Copy enhanced schema: `docker cp db/database-schema-enhanced.sql postgres:/tmp/`
 - [ ] Execute enhanced schema: `docker-compose exec postgres psql -U n8n_user -d whatsapp_support_agent -f /tmp/database-schema-enhanced.sql`
 - [ ] Verify new tables exist (handoff_requests, scheduled_messages, etc.)
 - [ ] Check sample agents: `SELECT * FROM agent_availability;`

@@ -312,13 +312,13 @@ PGPASSWORD=$POSTGRES_ADMIN_PASSWORD psql \
   -h $POSTGRES_HOST \
   -U $POSTGRES_ADMIN_USER \
   -d $POSTGRES_DATABASE \
-  -f database-schema.sql
+  -f db/database-schema.sql
 
 PGPASSWORD=$POSTGRES_ADMIN_PASSWORD psql \
   -h $POSTGRES_HOST \
   -U $POSTGRES_ADMIN_USER \
   -d $POSTGRES_DATABASE \
-  -f database-schema-enhanced.sql
+  -f db/database-schema-enhanced.sql
 ```
 
 ### Step 5: Create Azure Cache for Redis

@@ -340,7 +340,7 @@ INSERT INTO knowledge_base (title, content, category, tags) VALUES
 - **`message_stats`** - Daily message volumes
 - **`ai_performance_stats`** - Response times, token usage
 
-See [`database-schema.sql`](database-schema.sql) for complete schema.
+See [`db/database-schema.sql`](db/database-schema.sql) for complete schema. Full database documentation is available in the [db/ folder](db/README.md).
 
 ---
 

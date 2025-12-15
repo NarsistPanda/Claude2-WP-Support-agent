@@ -125,8 +125,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Initialize both base and enhanced schemas
-      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-base-schema.sql:ro
-      - ./database-schema-enhanced.sql:/docker-entrypoint-initdb.d/02-enhanced-schema.sql:ro
+      - ./db/database-schema.sql:/docker-entrypoint-initdb.d/01-base-schema.sql:ro
+      - ./db/database-schema-enhanced.sql:/docker-entrypoint-initdb.d/02-enhanced-schema.sql:ro
       - ./backups:/backups
     networks:
       - wpsupport-network

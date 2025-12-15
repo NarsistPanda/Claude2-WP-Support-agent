@@ -184,7 +184,7 @@ cd whatsapp-n8n-agent
 
 # Check files
 ls -la
-# Should see: docker-compose.yml, .env.example, database-schema.sql, etc.
+# Should see: docker-compose.yml, .env.example, db/, workflows/, etc.
 ```
 
 ### Step 1.5: Configure Domain (Production)
@@ -336,7 +336,7 @@ docker-compose logs postgres
 
 ```bash
 # Copy schema file into container
-docker cp database-schema.sql postgres:/tmp/
+docker cp db/database-schema.sql postgres:/tmp/
 
 # Execute base schema
 docker-compose exec postgres psql -U n8n_user -d whatsapp_support_agent -f /tmp/database-schema.sql
@@ -359,7 +359,7 @@ docker-compose exec postgres psql -U n8n_user -d whatsapp_support_agent -c "\dt"
 
 ```bash
 # Copy enhanced schema
-docker cp database-schema-enhanced.sql postgres:/tmp/
+docker cp db/database-schema-enhanced.sql postgres:/tmp/
 
 # Execute enhanced schema
 docker-compose exec postgres psql -U n8n_user -d whatsapp_support_agent -f /tmp/database-schema-enhanced.sql

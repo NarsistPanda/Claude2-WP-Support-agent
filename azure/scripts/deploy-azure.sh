@@ -214,8 +214,8 @@ initialize_database() {
     if ! command -v psql &> /dev/null; then
         print_warning "psql not found. Skipping database initialization."
         print_warning "Please install PostgreSQL client and run:"
-        print_warning "  PGPASSWORD='$POSTGRES_ADMIN_PASSWORD' psql -h $POSTGRES_HOST -U n8nadmin -d whatsapp_support_agent -f ../../database-schema.sql"
-        print_warning "  PGPASSWORD='$POSTGRES_ADMIN_PASSWORD' psql -h $POSTGRES_HOST -U n8nadmin -d whatsapp_support_agent -f ../../database-schema-enhanced.sql"
+        print_warning "  PGPASSWORD='$POSTGRES_ADMIN_PASSWORD' psql -h $POSTGRES_HOST -U n8nadmin -d whatsapp_support_agent -f ../../db/database-schema.sql"
+        print_warning "  PGPASSWORD='$POSTGRES_ADMIN_PASSWORD' psql -h $POSTGRES_HOST -U n8nadmin -d whatsapp_support_agent -f ../../db/database-schema-enhanced.sql"
         return
     fi
 
@@ -224,7 +224,7 @@ initialize_database() {
         -h "$POSTGRES_HOST" \
         -U n8nadmin \
         -d whatsapp_support_agent \
-        -f "../../database-schema.sql" \
+        -f "../../db/database-schema.sql" \
         --quiet
 
     print_info "Initializing enhanced schema..."
@@ -232,7 +232,7 @@ initialize_database() {
         -h "$POSTGRES_HOST" \
         -U n8nadmin \
         -d whatsapp_support_agent \
-        -f "../../database-schema-enhanced.sql" \
+        -f "../../db/database-schema-enhanced.sql" \
         --quiet
 
     print_success "Database initialized"

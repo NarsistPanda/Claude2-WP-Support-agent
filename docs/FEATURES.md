@@ -774,7 +774,7 @@ AWS_S3_BUCKET=whatsapp-videos
 
 ```bash
 # Apply enhanced schema
-psql -U n8n_user -d whatsapp_support_agent -f database-schema-enhanced.sql
+psql -U n8n_user -d whatsapp_support_agent -f db/database-schema-enhanced.sql
 ```
 
 ### Workflow Setup

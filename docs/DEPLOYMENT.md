@@ -197,7 +197,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database-schema.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/database-schema.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - n8n-network
     ports:
@@ -315,7 +315,7 @@ GRANT ALL PRIVILEGES ON DATABASE whatsapp_support_agent TO n8n_user;
 \q
 
 # Import schema
-psql -U n8n_user -d whatsapp_support_agent -f database-schema.sql
+psql -U n8n_user -d whatsapp_support_agent -f db/database-schema.sql
 ```
 
 ### Verify Database
