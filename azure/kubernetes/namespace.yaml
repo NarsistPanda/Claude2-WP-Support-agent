@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: whatsapp-support
+  labels:
+    name: whatsapp-support
+    app: whatsapp-ai-support-agent

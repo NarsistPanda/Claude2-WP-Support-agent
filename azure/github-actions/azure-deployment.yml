@@ -1,0 +1,223 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  AZURE_RESOURCE_GROUP: whatsapp-support-rg
+  AZURE_LOCATION: eastus
+  ACR_NAME: whatsappsupportacr
+  AKS_CLUSTER_NAME: whatsapp-support-aks
+  PROJECT_NAME: whatsapp-support
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push n8n image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/n8n:${{ github.sha }} -t ${{ secrets.ACR_LOGIN_SERVER }}/n8n:latest .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/n8n:${{ github.sha }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/n8n:latest
+
+  deploy-infrastructure:
+    name: Deploy Azure Infrastructure
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy ARM Template
+        uses: azure/arm-deploy@v1
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./azure/arm-templates/aci-deployment.json
+          parameters: >
+            projectName=${{ env.PROJECT_NAME }}
+            location=${{ env.AZURE_LOCATION }}
+            whatsappPhoneNumberId=${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+            whatsappAccessToken=${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+            whatsappVerifyToken=${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+            openaiApiKey=${{ secrets.OPENAI_API_KEY }}
+            n8nEncryptionKey=${{ secrets.N8N_ENCRYPTION_KEY }}
+            n8nBasicAuthPassword=${{ secrets.N8N_BASIC_AUTH_PASSWORD }}
+            postgresAdminPassword=${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+
+  deploy-to-aks:
+    name: Deploy to AKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/production'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AKS_CLUSTER_NAME }} \
+            --overwrite-existing
+
+      - name: Create Kubernetes secrets
+        run: |
+          # Create namespace if not exists
+          kubectl create namespace whatsapp-support --dry-run=client -o yaml | kubectl apply -f -
+
+          # Create secrets
+          kubectl create secret generic whatsapp-secrets \
+            --namespace whatsapp-support \
+            --from-literal=WHATSAPP_ACCESS_TOKEN="${{ secrets.WHATSAPP_ACCESS_TOKEN }}" \
+            --from-literal=WHATSAPP_PHONE_NUMBER_ID="${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}" \
+            --from-literal=WHATSAPP_VERIFY_TOKEN="${{ secrets.WHATSAPP_VERIFY_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic openai-secrets \
+            --namespace whatsapp-support \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic database-secrets \
+            --namespace whatsapp-support \
+            --from-literal=DB_HOST="${{ secrets.AZURE_POSTGRES_HOST }}" \
+            --from-literal=DB_USER="${{ secrets.AZURE_POSTGRES_USER }}" \
+            --from-literal=DB_PASSWORD="${{ secrets.AZURE_POSTGRES_PASSWORD }}" \
+            --from-literal=DB_NAME="whatsapp_support_agent" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic redis-secrets \
+            --namespace whatsapp-support \
+            --from-literal=REDIS_HOST="${{ secrets.AZURE_REDIS_HOST }}" \
+            --from-literal=REDIS_PASSWORD="${{ secrets.AZURE_REDIS_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic storage-secrets \
+            --namespace whatsapp-support \
+            --from-literal=AZURE_STORAGE_ACCOUNT="${{ secrets.AZURE_STORAGE_ACCOUNT }}" \
+            --from-literal=AZURE_STORAGE_KEY="${{ secrets.AZURE_STORAGE_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic n8n-secrets \
+            --namespace whatsapp-support \
+            --from-literal=N8N_ENCRYPTION_KEY="${{ secrets.N8N_ENCRYPTION_KEY }}" \
+            --from-literal=N8N_BASIC_AUTH_PASSWORD="${{ secrets.N8N_BASIC_AUTH_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to AKS
+        run: |
+          # Apply Kubernetes manifests
+          kubectl apply -f azure/kubernetes/namespace.yaml
+          kubectl apply -f azure/kubernetes/configmap.yaml
+          kubectl apply -f azure/kubernetes/n8n-deployment.yaml
+          kubectl apply -f azure/kubernetes/n8n-service.yaml
+          kubectl apply -f azure/kubernetes/hpa.yaml
+          kubectl apply -f azure/kubernetes/n8n-ingress.yaml
+
+      - name: Update deployment image
+        run: |
+          kubectl set image deployment/whatsapp-support-n8n \
+            n8n=${{ secrets.ACR_LOGIN_SERVER }}/n8n:${{ github.sha }} \
+            --namespace whatsapp-support
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/whatsapp-support-n8n \
+            --namespace whatsapp-support \
+            --timeout=5m
+
+      - name: Get deployment status
+        run: |
+          kubectl get pods -n whatsapp-support
+          kubectl get svc -n whatsapp-support
+          kubectl get ingress -n whatsapp-support
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-to-aks]
+    if: always()
+    steps:
+      - name: Notify Slack
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "✅ Deployment to Azure AKS succeeded!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*WhatsApp Support Agent Deployment*\n\n✅ Successfully deployed to production\n\nCommit: `${{ github.sha }}`\nBranch: `${{ github.ref_name }}`"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ Deployment to Azure AKS failed!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*WhatsApp Support Agent Deployment*\n\n❌ Deployment failed\n\nCommit: `${{ github.sha }}`\nBranch: `${{ github.ref_name }}`\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

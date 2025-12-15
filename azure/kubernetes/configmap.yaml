@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: whatsapp-support-config
+  namespace: whatsapp-support
+data:
+  # n8n Configuration
+  N8N_HOST: "0.0.0.0"
+  N8N_PORT: "5678"
+  N8N_PROTOCOL: "https"
+  N8N_BASIC_AUTH_ACTIVE: "true"
+  N8N_BASIC_AUTH_USER: "admin"
+
+  # Database Configuration
+  DB_TYPE: "postgresdb"
+  DB_POSTGRESDB_PORT: "5432"
+  DB_POSTGRESDB_DATABASE: "whatsapp_support_agent"
+  DB_POSTGRESDB_SSL: "true"
+
+  # Queue Configuration
+  EXECUTIONS_MODE: "queue"
+  QUEUE_BULL_REDIS_PORT: "6380"
+  QUEUE_BULL_REDIS_TLS: "true"
+  QUEUE_BULL_REDIS_DB: "0"
+  QUEUE_HEALTH_CHECK_ACTIVE: "true"
+
+  # Logging
+  N8N_LOG_LEVEL: "info"
+  N8N_LOG_OUTPUT: "console"
+
+  # Performance
+  N8N_PAYLOAD_SIZE_MAX: "32"
+  N8N_METRICS: "true"
+  N8N_METRICS_PREFIX: "n8n_"
+
+  # Execution Settings
+  EXECUTIONS_DATA_SAVE_ON_ERROR: "all"
+  EXECUTIONS_DATA_SAVE_ON_SUCCESS: "all"
+  EXECUTIONS_DATA_MAX_AGE: "168"
+  EXECUTIONS_DATA_PRUNE: "true"
+
+  # Azure Storage
+  AZURE_STORAGE_ENABLED: "true"
+  STORAGE_PROVIDER: "azure"

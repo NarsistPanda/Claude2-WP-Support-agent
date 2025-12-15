@@ -1,0 +1,413 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "projectName": {
+      "type": "string",
+      "defaultValue": "whatsapp-support",
+      "metadata": {
+        "description": "Project name for naming resources"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for resources"
+      }
+    },
+    "whatsappPhoneNumberId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "WhatsApp Phone Number ID from Meta"
+      }
+    },
+    "whatsappAccessToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "WhatsApp Access Token from Meta"
+      }
+    },
+    "whatsappVerifyToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "WhatsApp Verify Token (custom)"
+      }
+    },
+    "openaiApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "OpenAI API Key"
+      }
+    },
+    "n8nEncryptionKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "n8n Encryption Key"
+      }
+    },
+    "n8nBasicAuthPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "n8n Basic Auth Password"
+      }
+    },
+    "postgresAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "PostgreSQL Admin Password"
+      }
+    }
+  },
+  "variables": {
+    "containerName": "[concat(parameters('projectName'), '-n8n')]",
+    "dnsLabel": "[concat(parameters('projectName'), '-', uniqueString(resourceGroup().id))]",
+    "postgresServerName": "[concat(parameters('projectName'), '-postgres-', uniqueString(resourceGroup().id))]",
+    "redisName": "[concat(parameters('projectName'), '-redis-', uniqueString(resourceGroup().id))]",
+    "storageAccountName": "[concat(replace(parameters('projectName'), '-', ''), uniqueString(resourceGroup().id))]",
+    "keyVaultName": "[concat(parameters('projectName'), '-kv-', uniqueString(resourceGroup().id))]",
+    "acrName": "[concat(replace(parameters('projectName'), '-', ''), 'acr', uniqueString(resourceGroup().id))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-01-01-preview",
+      "name": "[variables('acrName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "adminUserEnabled": true
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2022-12-01",
+      "name": "[variables('postgresServerName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_B2s",
+        "tier": "Burstable"
+      },
+      "properties": {
+        "administratorLogin": "n8nadmin",
+        "administratorLoginPassword": "[parameters('postgresAdminPassword')]",
+        "version": "15",
+        "storage": {
+          "storageSizeGB": 32
+        },
+        "backup": {
+          "backupRetentionDays": 7,
+          "geoRedundantBackup": "Disabled"
+        },
+        "highAvailability": {
+          "mode": "Disabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2022-12-01",
+      "name": "[concat(variables('postgresServerName'), '/whatsapp_support_agent')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresServerName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+      "apiVersion": "2022-12-01",
+      "name": "[concat(variables('postgresServerName'), '/AllowAllAzureIPs')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresServerName'))]"
+      ],
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      }
+    },
+    {
+      "type": "Microsoft.Cache/redis",
+      "apiVersion": "2023-08-01",
+      "name": "[variables('redisName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "Basic",
+          "family": "C",
+          "capacity": 0
+        },
+        "enableNonSslPort": false,
+        "minimumTlsVersion": "1.2"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-01-01",
+      "name": "[concat(variables('storageAccountName'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[concat(variables('storageAccountName'), '/default/whatsapp-videos')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageAccountName'), 'default')]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[concat(variables('storageAccountName'), '/default/whatsapp-voice')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageAccountName'), 'default')]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[concat(variables('storageAccountName'), '/default/whatsapp-media')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageAccountName'), 'default')]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-02-01",
+      "name": "[variables('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enabledForDeployment": true,
+        "enabledForTemplateDeployment": true,
+        "enableRbacAuthorization": false,
+        "accessPolicies": []
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[concat(parameters('projectName'), '-insights')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web"
+      }
+    },
+    {
+      "type": "Microsoft.ContainerInstance/containerGroups",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('containerName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresServerName'))]",
+        "[resourceId('Microsoft.Cache/redis', variables('redisName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+      ],
+      "properties": {
+        "containers": [
+          {
+            "name": "n8n",
+            "properties": {
+              "image": "n8nio/n8n:latest",
+              "ports": [
+                {
+                  "port": 5678,
+                  "protocol": "TCP"
+                }
+              ],
+              "environmentVariables": [
+                {
+                  "name": "N8N_HOST",
+                  "value": "0.0.0.0"
+                },
+                {
+                  "name": "N8N_PORT",
+                  "value": "5678"
+                },
+                {
+                  "name": "N8N_PROTOCOL",
+                  "value": "https"
+                },
+                {
+                  "name": "N8N_BASIC_AUTH_ACTIVE",
+                  "value": "true"
+                },
+                {
+                  "name": "N8N_BASIC_AUTH_USER",
+                  "value": "admin"
+                },
+                {
+                  "name": "N8N_BASIC_AUTH_PASSWORD",
+                  "secureValue": "[parameters('n8nBasicAuthPassword')]"
+                },
+                {
+                  "name": "N8N_ENCRYPTION_KEY",
+                  "secureValue": "[parameters('n8nEncryptionKey')]"
+                },
+                {
+                  "name": "DB_TYPE",
+                  "value": "postgresdb"
+                },
+                {
+                  "name": "DB_POSTGRESDB_HOST",
+                  "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresServerName'))).fullyQualifiedDomainName]"
+                },
+                {
+                  "name": "DB_POSTGRESDB_PORT",
+                  "value": "5432"
+                },
+                {
+                  "name": "DB_POSTGRESDB_DATABASE",
+                  "value": "whatsapp_support_agent"
+                },
+                {
+                  "name": "DB_POSTGRESDB_USER",
+                  "value": "n8nadmin"
+                },
+                {
+                  "name": "DB_POSTGRESDB_PASSWORD",
+                  "secureValue": "[parameters('postgresAdminPassword')]"
+                },
+                {
+                  "name": "DB_POSTGRESDB_SSL",
+                  "value": "true"
+                },
+                {
+                  "name": "EXECUTIONS_MODE",
+                  "value": "queue"
+                },
+                {
+                  "name": "QUEUE_BULL_REDIS_HOST",
+                  "value": "[reference(resourceId('Microsoft.Cache/redis', variables('redisName'))).hostName]"
+                },
+                {
+                  "name": "QUEUE_BULL_REDIS_PORT",
+                  "value": "6380"
+                },
+                {
+                  "name": "QUEUE_BULL_REDIS_PASSWORD",
+                  "secureValue": "[listKeys(resourceId('Microsoft.Cache/redis', variables('redisName')), '2023-08-01').primaryKey]"
+                },
+                {
+                  "name": "QUEUE_BULL_REDIS_TLS",
+                  "value": "true"
+                },
+                {
+                  "name": "WHATSAPP_PHONE_NUMBER_ID",
+                  "secureValue": "[parameters('whatsappPhoneNumberId')]"
+                },
+                {
+                  "name": "WHATSAPP_ACCESS_TOKEN",
+                  "secureValue": "[parameters('whatsappAccessToken')]"
+                },
+                {
+                  "name": "WHATSAPP_VERIFY_TOKEN",
+                  "secureValue": "[parameters('whatsappVerifyToken')]"
+                },
+                {
+                  "name": "OPENAI_API_KEY",
+                  "secureValue": "[parameters('openaiApiKey')]"
+                },
+                {
+                  "name": "AZURE_STORAGE_ENABLED",
+                  "value": "true"
+                },
+                {
+                  "name": "AZURE_STORAGE_ACCOUNT",
+                  "value": "[variables('storageAccountName')]"
+                },
+                {
+                  "name": "AZURE_STORAGE_KEY",
+                  "secureValue": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2023-01-01').keys[0].value]"
+                },
+                {
+                  "name": "N8N_METRICS",
+                  "value": "true"
+                },
+                {
+                  "name": "N8N_LOG_LEVEL",
+                  "value": "info"
+                }
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": 2,
+                  "memoryInGB": 4
+                }
+              }
+            }
+          }
+        ],
+        "osType": "Linux",
+        "restartPolicy": "Always",
+        "ipAddress": {
+          "type": "Public",
+          "ports": [
+            {
+              "port": 5678,
+              "protocol": "TCP"
+            }
+          ],
+          "dnsNameLabel": "[variables('dnsLabel')]"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "n8nUrl": {
+      "type": "string",
+      "value": "[concat('https://', reference(resourceId('Microsoft.ContainerInstance/containerGroups', variables('containerName'))).ipAddress.fqdn, ':5678')]"
+    },
+    "postgresHost": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresServerName'))).fullyQualifiedDomainName]"
+    },
+    "redisHost": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Cache/redis', variables('redisName'))).hostName]"
+    },
+    "storageAccount": {
+      "type": "string",
+      "value": "[variables('storageAccountName')]"
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[variables('keyVaultName')]"
+    },
+    "containerRegistry": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrName'))).loginServer]"
+    }
+  }
+}
