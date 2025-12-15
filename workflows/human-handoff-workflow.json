@@ -1,0 +1,634 @@
+{
+  "name": "WhatsApp Human Handoff",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Check Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Get pending handoff requests with user context\nSELECT \n  hr.id,\n  hr.phone_number,\n  hr.reason,\n  hr.priority,\n  hr.conversation_context,\n  hr.sentiment_score,\n  hr.created_at,\n  u.contact_name,\n  u.language_preference,\n  EXTRACT(EPOCH FROM (NOW() - hr.created_at)) as wait_time_seconds\nFROM handoff_requests hr\nLEFT JOIN users u ON hr.phone_number = u.phone_number\nWHERE hr.status = 'pending'\nORDER BY \n  CASE hr.priority \n    WHEN 'urgent' THEN 1\n    WHEN 'high' THEN 2\n    WHEN 'medium' THEN 3\n    WHEN 'low' THEN 4\n  END,\n  hr.created_at ASC\nLIMIT 10;"
+      },
+      "id": "get-pending-handoffs",
+      "name": "Get Pending Handoffs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [460, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combineOperation": "all"
+        }
+      },
+      "id": "check-handoffs-exist",
+      "name": "Check Handoffs Exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract skills needed based on handoff reason\nconst items = [];\n\nfor (const item of $input.all()) {\n  const reason = item.json.reason || '';\n  const priority = item.json.priority || 'medium';\n  \n  // Determine required skills based on reason\n  let requiredSkills = [];\n  \n  if (reason.includes('billing') || reason.includes('payment')) {\n    requiredSkills.push('billing');\n  } else if (reason.includes('technical') || reason.includes('bug')) {\n    requiredSkills.push('technical');\n  } else if (reason.includes('sales') || reason.includes('upgrade')) {\n    requiredSkills.push('sales');\n  } else {\n    requiredSkills.push('general');\n  }\n  \n  // Add sentiment-based skill requirement\n  if (item.json.sentiment_score && item.json.sentiment_score < 0.3) {\n    requiredSkills.push('conflict_resolution');\n  }\n  \n  items.push({\n    json: {\n      ...item.json,\n      requiredSkills: requiredSkills,\n      isUrgent: priority === 'urgent' || priority === 'high'\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "analyze-handoff-requirements",
+      "name": "Analyze Handoff Requirements",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 340]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Find best available agent\nWITH available_agents AS (\n  SELECT \n    agent_id,\n    agent_name,\n    email,\n    slack_user_id,\n    status,\n    current_chat_count,\n    max_concurrent_chats,\n    skills,\n    languages,\n    (max_concurrent_chats - current_chat_count) as capacity,\n    last_seen_at\n  FROM agent_availability\n  WHERE status = 'online'\n    AND current_chat_count < max_concurrent_chats\n    AND last_seen_at > NOW() - INTERVAL '10 minutes'\n)\nSELECT *\nFROM available_agents\nWHERE \n  -- Match skills if required skills provided\n  CASE \n    WHEN $1::text[] IS NOT NULL THEN \n      skills && $1::text[]\n    ELSE TRUE\n  END\nORDER BY \n  capacity DESC,\n  current_chat_count ASC,\n  last_seen_at DESC\nLIMIT 1;",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.requiredSkills ? '{' + $json.requiredSkills.join(',') + '}' : null }}"
+            }
+          ]
+        }
+      },
+      "id": "find-available-agent",
+      "name": "Find Available Agent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1120, 340],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.agent_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combineOperation": "all"
+        }
+      },
+      "id": "check-agent-found",
+      "name": "Check Agent Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge handoff request data with agent data\nconst handoffData = $('Analyze Handoff Requirements').all()[0].json;\nconst agentData = $input.all()[0].json;\n\nreturn [{\n  json: {\n    // Handoff request data\n    handoffId: handoffData.id,\n    phoneNumber: handoffData.phone_number,\n    reason: handoffData.reason,\n    priority: handoffData.priority,\n    conversationContext: handoffData.conversation_context,\n    sentimentScore: handoffData.sentiment_score,\n    contactName: handoffData.contact_name || 'Unknown User',\n    languagePreference: handoffData.language_preference || 'en',\n    waitTimeSeconds: Math.floor(handoffData.wait_time_seconds),\n    \n    // Agent data\n    agentId: agentData.agent_id,\n    agentName: agentData.agent_name,\n    agentEmail: agentData.email,\n    agentSlackUserId: agentData.slack_user_id,\n    agentSkills: agentData.skills,\n    \n    // Additional metadata\n    assignedAt: new Date().toISOString(),\n    isUrgent: handoffData.isUrgent\n  }\n}];"
+      },
+      "id": "merge-handoff-agent-data",
+      "name": "Merge Handoff & Agent Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 280]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Update handoff request with assigned agent\nUPDATE handoff_requests\nSET \n  status = 'assigned',\n  assigned_to = $1,\n  assigned_at = NOW(),\n  wait_time_seconds = $2\nWHERE id = $3\nRETURNING *;",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.agentId }}"
+            },
+            {
+              "parameter": "={{ $json.waitTimeSeconds }}"
+            },
+            {
+              "parameter": "={{ $json.handoffId }}"
+            }
+          ]
+        }
+      },
+      "id": "update-handoff-assigned",
+      "name": "Update Handoff: Assigned",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1780, 280],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Create active handoff session\nINSERT INTO active_handoffs (\n  id,\n  handoff_request_id,\n  phone_number,\n  agent_id,\n  channel,\n  slack_channel_id,\n  conversation_messages,\n  status,\n  started_at,\n  last_message_at\n)\nVALUES (\n  gen_random_uuid(),\n  $1,\n  $2,\n  $3,\n  'slack',\n  NULL,\n  '[]'::jsonb,\n  'active',\n  NOW(),\n  NOW()\n)\nRETURNING *;",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.handoffId }}"
+            },
+            {
+              "parameter": "={{ $json.phoneNumber }}"
+            },
+            {
+              "parameter": "={{ $json.agentId }}"
+            }
+          ]
+        }
+      },
+      "id": "create-active-handoff",
+      "name": "Create Active Handoff",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2000, 280],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Increment agent's current chat count\nUPDATE agent_availability\nSET \n  current_chat_count = current_chat_count + 1,\n  updated_at = NOW()\nWHERE agent_id = $1\nRETURNING *;",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $json.agentId }}"
+            }
+          ]
+        }
+      },
+      "id": "increment-agent-chat-count",
+      "name": "Increment Agent Chat Count",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2220, 280],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Slack notification message\nconst handoffData = $('Merge Handoff & Agent Data').all()[0].json;\n\n// Format conversation context preview\nlet contextPreview = 'No previous messages';\nif (handoffData.conversationContext && Array.isArray(handoffData.conversationContext)) {\n  const recentMessages = handoffData.conversationContext.slice(-5);\n  contextPreview = recentMessages\n    .map(msg => `${msg.role === 'user' ? '👤 User' : '🤖 AI'}: ${msg.content.substring(0, 100)}...`)\n    .join('\\n');\n}\n\n// Determine urgency emoji and color\nconst urgencyEmoji = handoffData.isUrgent ? '🚨' : '⚠️';\nconst priorityColor = {\n  'urgent': '#FF0000',\n  'high': '#FF6600',\n  'medium': '#FFAA00',\n  'low': '#00AA00'\n}[handoffData.priority] || '#FFAA00';\n\n// Format wait time\nconst waitMinutes = Math.floor(handoffData.waitTimeSeconds / 60);\nconst waitSeconds = handoffData.waitTimeSeconds % 60;\nconst waitTime = waitMinutes > 0 \n  ? `${waitMinutes}m ${waitSeconds}s`\n  : `${waitSeconds}s`;\n\n// Sentiment indicator\nconst sentimentEmoji = handoffData.sentimentScore < 0.3 ? '😟' \n  : handoffData.sentimentScore < 0.6 ? '😐' \n  : '😊';\n\nreturn [{\n  json: {\n    ...handoffData,\n    slackMessage: {\n      channel: $env.SLACK_HANDOFF_CHANNEL || '#customer-support',\n      text: `${urgencyEmoji} New Handoff Request`,\n      blocks: [\n        {\n          type: 'header',\n          text: {\n            type: 'plain_text',\n            text: `${urgencyEmoji} New Handoff Request - ${handoffData.priority.toUpperCase()} Priority`\n          }\n        },\n        {\n          type: 'section',\n          fields: [\n            {\n              type: 'mrkdwn',\n              text: `*Customer:*\\n${handoffData.contactName}`\n            },\n            {\n              type: 'mrkdwn',\n              text: `*Phone:*\\n${handoffData.phoneNumber}`\n            },\n            {\n              type: 'mrkdwn',\n              text: `*Assigned Agent:*\\n<@${handoffData.agentSlackUserId || handoffData.agentId}>`\n            },\n            {\n              type: 'mrkdwn',\n              text: `*Wait Time:*\\n${waitTime}`\n            },\n            {\n              type: 'mrkdwn',\n              text: `*Reason:*\\n${handoffData.reason}`\n            },\n            {\n              type: 'mrkdwn',\n              text: `*Sentiment:*\\n${sentimentEmoji} ${handoffData.sentimentScore ? (handoffData.sentimentScore * 100).toFixed(0) + '%' : 'N/A'}`\n            }\n          ]\n        },\n        {\n          type: 'section',\n          text: {\n            type: 'mrkdwn',\n            text: `*Recent Conversation:*\\n\\`\\`\\`${contextPreview}\\`\\`\\``\n          }\n        },\n        {\n          type: 'actions',\n          elements: [\n            {\n              type: 'button',\n              text: {\n                type: 'plain_text',\n                text: '✅ Accept Handoff'\n              },\n              style: 'primary',\n              value: handoffData.handoffId,\n              action_id: 'accept_handoff'\n            },\n            {\n              type: 'button',\n              text: {\n                type: 'plain_text',\n                text: '📞 View Full History'\n              },\n              value: handoffData.phoneNumber,\n              action_id: 'view_history'\n            },\n            {\n              type: 'button',\n              text: {\n                type: 'plain_text',\n                text: '🔄 Reassign'\n              },\n              value: handoffData.handoffId,\n              action_id: 'reassign_handoff'\n            }\n          ]\n        },\n        {\n          type: 'context',\n          elements: [\n            {\n              type: 'mrkdwn',\n              text: `Handoff ID: ${handoffData.handoffId} | Language: ${handoffData.languagePreference} | Assigned: <!date^${Math.floor(Date.now() / 1000)}^{date_short_pretty} at {time}|just now>`\n            }\n          ]\n        }\n      ],\n      attachments: [\n        {\n          color: priorityColor,\n          text: `💡 *Quick Actions:* Reply to this thread to message the customer directly via WhatsApp`\n        }\n      ]\n    }\n  }\n}];"
+      },
+      "id": "prepare-slack-notification",
+      "name": "Prepare Slack Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 280]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{ $json.slackMessage.channel }}",
+        "text": "={{ $json.slackMessage.text }}",
+        "otherOptions": {
+          "blocks": "={{ JSON.stringify($json.slackMessage.blocks) }}",
+          "attachments": "={{ JSON.stringify($json.slackMessage.attachments) }}"
+        }
+      },
+      "id": "send-slack-notification",
+      "name": "Send Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [2660, 200],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-credentials",
+          "name": "Slack API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare email notification as backup\nconst handoffData = $('Merge Handoff & Agent Data').all()[0].json;\n\n// Format conversation context\nlet contextHtml = '<p><em>No previous messages</em></p>';\nif (handoffData.conversationContext && Array.isArray(handoffData.conversationContext)) {\n  const recentMessages = handoffData.conversationContext.slice(-10);\n  contextHtml = '<div style=\"background: #f5f5f5; padding: 15px; border-radius: 5px;\">';\n  \n  recentMessages.forEach(msg => {\n    const role = msg.role === 'user' ? '👤 User' : '🤖 AI';\n    const bgColor = msg.role === 'user' ? '#e3f2fd' : '#fff3e0';\n    contextHtml += `\n      <div style=\"margin: 10px 0; padding: 10px; background: ${bgColor}; border-radius: 3px;\">\n        <strong>${role}:</strong> ${msg.content}\n      </div>\n    `;\n  });\n  \n  contextHtml += '</div>';\n}\n\n// Determine priority badge\nconst priorityBadge = {\n  'urgent': '<span style=\"background: #f44336; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;\">🚨 URGENT</span>',\n  'high': '<span style=\"background: #ff9800; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;\">⚠️ HIGH</span>',\n  'medium': '<span style=\"background: #ffc107; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;\">⚠️ MEDIUM</span>',\n  'low': '<span style=\"background: #4caf50; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;\">ℹ️ LOW</span>'\n}[handoffData.priority] || '';\n\nconst waitMinutes = Math.floor(handoffData.waitTimeSeconds / 60);\nconst sentimentPercent = handoffData.sentimentScore ? (handoffData.sentimentScore * 100).toFixed(0) : 'N/A';\n\nconst emailHtml = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background: #1976d2; color: white; padding: 20px; border-radius: 5px 5px 0 0; }\n    .content { background: white; padding: 20px; border: 1px solid #ddd; border-top: none; }\n    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }\n    .info-item { padding: 10px; background: #f9f9f9; border-left: 3px solid #1976d2; }\n    .label { font-weight: bold; color: #666; font-size: 12px; }\n    .value { font-size: 16px; margin-top: 5px; }\n    .button { display: inline-block; padding: 12px 24px; background: #1976d2; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }\n    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1 style=\"margin: 0;\">🔔 New Handoff Assignment</h1>\n      <p style=\"margin: 10px 0 0 0;\">You have been assigned a customer handoff</p>\n    </div>\n    \n    <div class=\"content\">\n      <div style=\"margin: 20px 0;\">\n        ${priorityBadge}\n      </div>\n      \n      <div class=\"info-grid\">\n        <div class=\"info-item\">\n          <div class=\"label\">CUSTOMER</div>\n          <div class=\"value\">${handoffData.contactName}</div>\n        </div>\n        <div class=\"info-item\">\n          <div class=\"label\">PHONE NUMBER</div>\n          <div class=\"value\">${handoffData.phoneNumber}</div>\n        </div>\n        <div class=\"info-item\">\n          <div class=\"label\">HANDOFF REASON</div>\n          <div class=\"value\">${handoffData.reason}</div>\n        </div>\n        <div class=\"info-item\">\n          <div class=\"label\">WAIT TIME</div>\n          <div class=\"value\">${waitMinutes} minutes</div>\n        </div>\n        <div class=\"info-item\">\n          <div class=\"label\">SENTIMENT SCORE</div>\n          <div class=\"value\">${sentimentPercent}%</div>\n        </div>\n        <div class=\"info-item\">\n          <div class=\"label\">LANGUAGE</div>\n          <div class=\"value\">${handoffData.languagePreference.toUpperCase()}</div>\n        </div>\n      </div>\n      \n      <h3>Recent Conversation History</h3>\n      ${contextHtml}\n      \n      <div style=\"margin-top: 30px; text-align: center;\">\n        <a href=\"${$env.N8N_URL || 'https://your-n8n-instance.com'}/workflow\" class=\"button\">Access n8n Dashboard</a>\n        <a href=\"${$env.SLACK_WORKSPACE_URL || 'https://slack.com'}\" class=\"button\">Open Slack</a>\n      </div>\n      \n      <div class=\"footer\">\n        <p>Handoff ID: ${handoffData.handoffId}</p>\n        <p>Assigned at ${new Date(handoffData.assignedAt).toLocaleString()}</p>\n        <p>This is an automated notification from WhatsApp Support Agent</p>\n      </div>\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    ...handoffData,\n    emailSubject: `🔔 New ${handoffData.priority.toUpperCase()} Priority Handoff - ${handoffData.contactName}`,\n    emailHtml: emailHtml,\n    emailTo: handoffData.agentEmail || $env.FALLBACK_AGENT_EMAIL\n  }\n}];"
+      },
+      "id": "prepare-email-notification",
+      "name": "Prepare Email Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2660, 360]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SMTP_FROM_EMAIL || 'support@yourcompany.com' }}",
+        "toEmail": "={{ $json.emailTo }}",
+        "subject": "={{ $json.emailSubject }}",
+        "emailType": "html",
+        "message": "={{ $json.emailHtml }}"
+      },
+      "id": "send-email-notification",
+      "name": "Send Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [2880, 360],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "={{ $env.HANDOFF_WEBHOOK_URL }}",
+        "options": {
+          "headers": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Authorization",
+                "value": "Bearer {{ $env.HANDOFF_WEBHOOK_TOKEN }}"
+              }
+            ]
+          },
+          "bodyParametersJson": "={{ JSON.stringify($json) }}"
+        }
+      },
+      "id": "send-webhook-notification",
+      "name": "Send Webhook Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2660, 520],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "merge-notifications",
+      "name": "Merge Notifications",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3100, 340]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Log successful handoff\nINSERT INTO analytics (phone_number, event_type, event_data, timestamp)\nVALUES (\n  $1,\n  'handoff_assigned',\n  jsonb_build_object(\n    'handoff_id', $2,\n    'agent_id', $3,\n    'reason', $4,\n    'priority', $5,\n    'wait_time_seconds', $6\n  ),\n  NOW()\n);",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $('Merge Handoff & Agent Data').all()[0].json.phoneNumber }}"
+            },
+            {
+              "parameter": "={{ $('Merge Handoff & Agent Data').all()[0].json.handoffId }}"
+            },
+            {
+              "parameter": "={{ $('Merge Handoff & Agent Data').all()[0].json.agentId }}"
+            },
+            {
+              "parameter": "={{ $('Merge Handoff & Agent Data').all()[0].json.reason }}"
+            },
+            {
+              "parameter": "={{ $('Merge Handoff & Agent Data').all()[0].json.priority }}"
+            },
+            {
+              "parameter": "={{ $('Merge Handoff & Agent Data').all()[0].json.waitTimeSeconds }}"
+            }
+          ]
+        }
+      },
+      "id": "log-handoff-analytics",
+      "name": "Log Handoff Analytics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [3320, 340],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Mark handoff as failed if no agent available\nUPDATE handoff_requests\nSET \n  status = 'pending',\n  metadata = jsonb_build_object(\n    'no_agent_available', true,\n    'retry_count', COALESCE((metadata->>'retry_count')::int, 0) + 1,\n    'last_retry_at', NOW()\n  )\nWHERE id = $1;",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $('Analyze Handoff Requirements').all()[0].json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "mark-no-agent-available",
+      "name": "Mark: No Agent Available",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1560, 460],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Log error for no available agent\nINSERT INTO error_logs (\n  phone_number,\n  error_type,\n  error_message,\n  severity,\n  context,\n  timestamp\n)\nVALUES (\n  $1,\n  'no_agent_available',\n  'No agent available for handoff request',\n  'warning',\n  jsonb_build_object(\n    'handoff_id', $2,\n    'reason', $3,\n    'priority', $4,\n    'retry_count', COALESCE((SELECT metadata->>'retry_count' FROM handoff_requests WHERE id = $2)::int, 1)\n  ),\n  NOW()\n);",
+        "queryParameters": {
+          "parameters": [
+            {
+              "parameter": "={{ $('Analyze Handoff Requirements').all()[0].json.phone_number }}"
+            },
+            {
+              "parameter": "={{ $('Analyze Handoff Requirements').all()[0].json.id }}"
+            },
+            {
+              "parameter": "={{ $('Analyze Handoff Requirements').all()[0].json.reason }}"
+            },
+            {
+              "parameter": "={{ $('Analyze Handoff Requirements').all()[0].json.priority }}"
+            }
+          ]
+        }
+      },
+      "id": "log-no-agent-error",
+      "name": "Log No Agent Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1780, 460],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Check Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Handoffs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Handoffs": {
+      "main": [
+        [
+          {
+            "node": "Check Handoffs Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Handoffs Exist": {
+      "main": [
+        [
+          {
+            "node": "Analyze Handoff Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Handoff Requirements": {
+      "main": [
+        [
+          {
+            "node": "Find Available Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Available Agent": {
+      "main": [
+        [
+          {
+            "node": "Check Agent Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Agent Found": {
+      "main": [
+        [
+          {
+            "node": "Merge Handoff & Agent Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark: No Agent Available",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Handoff & Agent Data": {
+      "main": [
+        [
+          {
+            "node": "Update Handoff: Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Handoff: Assigned": {
+      "main": [
+        [
+          {
+            "node": "Create Active Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Active Handoff": {
+      "main": [
+        [
+          {
+            "node": "Increment Agent Chat Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Agent Chat Count": {
+      "main": [
+        [
+          {
+            "node": "Prepare Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Slack Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Email Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Webhook Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Slack Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Notifications",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send Webhook Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Notifications",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Notifications": {
+      "main": [
+        [
+          {
+            "node": "Log Handoff Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark: No Agent Available": {
+      "main": [
+        [
+          {
+            "node": "Log No Agent Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-15T00:00:00.000Z",
+  "versionId": "1"
+}

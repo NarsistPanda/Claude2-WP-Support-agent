@@ -65,9 +65,27 @@ HANDOFF_WEBHOOK_AUTH=Bearer your-api-key
 
 #### 3. Import Handoff Workflow
 
-1. Import `workflows/human-handoff-workflow.json`
-2. Configure credentials (Slack, Email, or HTTP)
-3. Activate workflow
+1. Import `workflows/human-handoff-workflow.json` to n8n
+2. Configure credentials (PostgreSQL, Slack, Email SMTP)
+3. Set environment variables in `.env`:
+   ```bash
+   SLACK_HANDOFF_CHANNEL=#customer-support
+   SLACK_WORKSPACE_URL=https://yourworkspace.slack.com
+   SMTP_FROM_EMAIL=support@yourcompany.com
+   FALLBACK_AGENT_EMAIL=fallback@yourcompany.com
+   HANDOFF_WEBHOOK_URL=https://your-crm.com/api/handoff  # Optional
+   HANDOFF_WEBHOOK_TOKEN=your-webhook-secret-token        # Optional
+   ```
+4. Activate workflow (it will poll database every 1 minute)
+
+**📖 Complete Setup Guide:** See [workflows/HUMAN-HANDOFF-GUIDE.md](../workflows/HUMAN-HANDOFF-GUIDE.md) for comprehensive documentation including:
+- Detailed workflow architecture
+- Agent management best practices
+- Skill-based routing configuration
+- Multi-channel notification setup
+- Message routing between agents and users
+- Analytics and monitoring dashboards
+- Troubleshooting common issues
 
 ### How It Works
 
